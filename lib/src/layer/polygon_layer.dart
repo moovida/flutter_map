@@ -4,16 +4,19 @@ import 'dart:ui';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map/src/map/map.dart';
-import 'package:latlong/latlong.dart' hide Path; // conflict with Path from UI
+import 'package:latlong/latlong.dart' hide Path;
+import 'package:simplify_dart/simplify_dart.dart'; // conflict with Path from UI
 
 class PolygonLayerOptions extends LayerOptions {
   final List<Polygon> polygons;
   final bool polygonCulling;
+  final bool simplify;
 
   /// screen space culling of polygons based on bounding box
   PolygonLayerOptions({
     this.polygons = const [],
     this.polygonCulling = false,
+    this.simplify = false,
     rebuild,
   }) : super(rebuild: rebuild) {
     if (polygonCulling) {
@@ -88,7 +91,28 @@ class PolygonLayer extends StatelessWidget {
             continue;
           }
 
-          _fillOffsets(polygon.offsets, polygon.points);
+          var points = polygon.points;
+          if (polygonOpts.simplify) {
+            var zoom = map.zoom;
+            var tolerance = 0.0;
+            if (zoom >= 0 && zoom < 3) {
+              tolerance = 0.5;
+            } else if (zoom >= 3 && zoom < 5) {
+              tolerance = 0.1;
+            } else if (zoom >= 5 && zoom < 7) {
+              tolerance = 0.05;
+            } else if (zoom == 7 ) {
+              tolerance = 0.01;
+            } else if (zoom == 8 ) {
+              tolerance = 0.005;
+            } else if (zoom >= 9 && zoom <12 ) {
+              tolerance = 0.001;
+            } else if (zoom > 12 && zoom < 17 ) {
+              tolerance = 0.0001;
+            }
+            points = simplify(points, tolerance: tolerance).map((p) => LatLng(p.y,p.x)).toList();
+          }
+          _fillOffsets(polygon.offsets, points);
 
           if (null != polygon.holePointsList) {
             for (var i = 0, len = polygon.holePointsList.length; i < len; ++i) {
