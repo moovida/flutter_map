@@ -111,7 +111,7 @@ class PolygonLayer extends StatelessWidget {
               tolerance = 0.0001;
             }
             points = simplify(
-                    points.map((ll) => Point(ll.longitude, ll.latitude)),
+                    points.map((ll) => Point(ll.longitude, ll.latitude)).toList(),
                     tolerance: tolerance)
                 .map((p) => LatLng(p.y, p.x))
                 .toList();
