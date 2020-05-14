@@ -101,16 +101,20 @@ class PolygonLayer extends StatelessWidget {
               tolerance = 0.1;
             } else if (zoom >= 5 && zoom < 7) {
               tolerance = 0.05;
-            } else if (zoom == 7 ) {
+            } else if (zoom == 7) {
               tolerance = 0.01;
-            } else if (zoom == 8 ) {
+            } else if (zoom == 8) {
               tolerance = 0.005;
-            } else if (zoom >= 9 && zoom <12 ) {
+            } else if (zoom >= 9 && zoom < 12) {
               tolerance = 0.001;
-            } else if (zoom > 12 && zoom < 17 ) {
+            } else if (zoom > 12 && zoom < 17) {
               tolerance = 0.0001;
             }
-            points = simplify(points, tolerance: tolerance).map((p) => LatLng(p.y,p.x)).toList();
+            points = simplify(
+                    points.map((ll) => Point(ll.longitude, ll.latitude)),
+                    tolerance: tolerance)
+                .map((p) => LatLng(p.y, p.x))
+                .toList();
           }
           _fillOffsets(polygon.offsets, points);
 
