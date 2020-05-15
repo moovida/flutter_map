@@ -9,10 +9,12 @@ import 'package:latlong/latlong.dart';
 class PolylineLayerOptions extends LayerOptions {
   final List<Polyline> polylines;
   final bool polylineCulling;
+  final bool simplify;
 
   PolylineLayerOptions({
     this.polylines = const [],
     this.polylineCulling = false,
+    this.simplify = false,
     rebuild,
   }) : super(rebuild: rebuild) {
     if (polylineCulling) {
@@ -79,7 +81,11 @@ class PolylineLayer extends StatelessWidget {
             continue;
           }
 
-          _fillOffsets(polylineOpt.offsets, polylineOpt.points);
+          var points = polylineOpt.points;
+          if (polylineOpts.simplify) {
+            points = Simplification.simplifyByZoom(points, map.zoom);
+          }
+          _fillOffsets(polylineOpt.offsets, points);
 
           polylines.add(CustomPaint(
             painter: PolylinePainter(polylineOpt),

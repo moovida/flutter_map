@@ -5,7 +5,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map/src/map/map.dart';
 import 'package:latlong/latlong.dart' hide Path;
-import 'package:simplify_dart/simplify_dart.dart'; // conflict with Path from UI
 
 class PolygonLayerOptions extends LayerOptions {
   final List<Polygon> polygons;
@@ -93,28 +92,7 @@ class PolygonLayer extends StatelessWidget {
 
           var points = polygon.points;
           if (polygonOpts.simplify) {
-            var zoom = map.zoom;
-            var tolerance = 0.0;
-            if (zoom >= 0 && zoom < 3) {
-              tolerance = 0.5;
-            } else if (zoom >= 3 && zoom < 5) {
-              tolerance = 0.1;
-            } else if (zoom >= 5 && zoom < 7) {
-              tolerance = 0.05;
-            } else if (zoom == 7) {
-              tolerance = 0.01;
-            } else if (zoom == 8) {
-              tolerance = 0.005;
-            } else if (zoom >= 9 && zoom < 12) {
-              tolerance = 0.001;
-            } else if (zoom > 12 && zoom < 17) {
-              tolerance = 0.0001;
-            }
-            points = simplify(
-                    points.map((ll) => Point(ll.longitude, ll.latitude)).toList(),
-                    tolerance: tolerance)
-                .map((p) => LatLng(p.y, p.x))
-                .toList();
+            points = Simplification.simplifyByZoom(points, map.zoom);
           }
           _fillOffsets(polygon.offsets, points);
 
@@ -285,5 +263,131 @@ class PolygonPainter extends CustomPainter {
 
   double _sqr(double x) {
     return x * x;
+  }
+}
+
+class Simplification {
+  /// Code ported from  (c) 2017, Vladimir Agafonkin
+  /// Simplify.js, a high-performance JS polyline simplification library
+  /// mourner.github.io/simplify-js
+
+// square distance between 2 points
+  static double getSqDist(LatLng p1, LatLng p2) {
+    var dx = p1.longitude - p2.longitude, dy = p1.latitude - p2.latitude;
+
+    return dx * dx + dy * dy;
+  }
+
+// square distance from a point to a segment
+  static double getSqSegDist(LatLng p, LatLng p1, LatLng p2) {
+    var x = p1.longitude,
+        y = p1.latitude,
+        dx = p2.longitude - x,
+        dy = p2.latitude - y;
+
+    if (dx != 0 || dy != 0) {
+      var t = ((p.longitude - x) * dx + (p.latitude - y) * dy) /
+          (dx * dx + dy * dy);
+
+      if (t > 1) {
+        x = p2.longitude;
+        y = p2.latitude;
+      } else if (t > 0) {
+        x += dx * t;
+        y += dy * t;
+      }
+    }
+
+    dx = p.longitude - x;
+    dy = p.latitude - y;
+
+    return dx * dx + dy * dy;
+  }
+// rest of the code doesn't care about point format
+
+// basic distance-based simplification
+  static List<LatLng> simplifyRadialDist(List<LatLng> points, sqTolerance) {
+    var prevPoint = points[0], newPoints = [prevPoint], point;
+
+    for (var i = 1, len = points.length; i < len; i++) {
+      point = points[i];
+
+      if (getSqDist(point, prevPoint) > sqTolerance) {
+        newPoints.add(point);
+        prevPoint = point;
+      }
+    }
+
+    if (prevPoint != point) newPoints.add(point);
+
+    return newPoints;
+  }
+
+  static void simplifyDPStep(
+      List<LatLng> points, first, last, sqTolerance, simplified) {
+    var maxSqDist = sqTolerance, index;
+
+    for (var i = first + 1; i < last; i++) {
+      var sqDist = getSqSegDist(points[i], points[first], points[last]);
+
+      if (sqDist > maxSqDist) {
+        index = i;
+        maxSqDist = sqDist;
+      }
+    }
+
+    if (maxSqDist > sqTolerance) {
+      if (index - first > 1) {
+        simplifyDPStep(points, first, index, sqTolerance, simplified);
+      }
+      simplified.add(points[index]);
+      if (last - index > 1) {
+        simplifyDPStep(points, index, last, sqTolerance, simplified);
+      }
+    }
+  }
+
+// simplification using Ramer-Douglas-Peucker algorithm
+  static List<LatLng> simplifyDouglasPeucker(points, sqTolerance) {
+    var last = points.length - 1;
+
+    var simplified = [points[0]];
+    simplifyDPStep(points, 0, last, sqTolerance, simplified);
+    simplified.add(points[last]);
+
+    return simplified;
+  }
+
+// both algorithms combined for awesome performance
+  static List<LatLng> simplify(points,
+      {tolerance = 1, highestQuality = false}) {
+    if (points.length <= 2) return points;
+
+    var sqTolerance = tolerance != null ? tolerance * tolerance : 1;
+
+    points = highestQuality ? points : simplifyRadialDist(points, sqTolerance);
+    points = simplifyDouglasPeucker(points, sqTolerance);
+
+    return points;
+  }
+
+  static List<LatLng> simplifyByZoom(points, zoom) {
+    var tolerance = 0.0;
+    if (zoom >= 0 && zoom < 3) {
+      tolerance = 0.5;
+    } else if (zoom >= 3 && zoom < 5) {
+      tolerance = 0.1;
+    } else if (zoom >= 5 && zoom < 7) {
+      tolerance = 0.05;
+    } else if (zoom == 7) {
+      tolerance = 0.01;
+    } else if (zoom == 8) {
+      tolerance = 0.005;
+    } else if (zoom >= 9 && zoom < 12) {
+      tolerance = 0.001;
+    } else if (zoom > 12 && zoom < 17) {
+      tolerance = 0.0001;
+    }
+    return Simplification.simplify(points, tolerance: tolerance);
   }
 }
