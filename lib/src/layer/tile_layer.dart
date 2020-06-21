@@ -1031,6 +1031,7 @@ class Tile implements Comparable<Tile> {
     }
 
     animationController?.removeStatusListener(_onAnimateEnd);
+    animationController?.dispose(); // as of discussion in https://github.com/johnpryan/flutter_map/pull/584
     _imageStream?.removeListener(_listener);
   }
 
